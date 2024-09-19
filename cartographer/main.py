@@ -46,7 +46,7 @@ class Cartographer(Cog):
     """
 
     def __init__(self, bot: Red):
-        super().__init__()
+        super().__init__(bot)
         self.bot = bot
         self.config = Config.get_conf(self, 117, force_registration=True)
         self.config.register_global(db={})
