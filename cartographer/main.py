@@ -15,9 +15,8 @@ from .common.formatting import humanize_size
 from .common.models import DB
 from .common.serializers import GuildBackup
 from .common.views import BackupMenu
-from Star_Utils import Cog
 
-log = logging.getLogger("star.cartographer")
+log = logging.getLogger("red.vrt.cartographer")
 _ = Translator("Cartographer", __file__)
 RequestType = t.Literal["discord_deleted_user", "owner", "user", "user_strict"]
 
@@ -26,7 +25,7 @@ RequestType = t.Literal["discord_deleted_user", "owner", "user", "user_strict"]
 
 
 @cog_i18n(_)
-class Cartographer(Cog):
+class Cartographer(commands.Cog):
     """
     Backup & Restore tools for Discord servers.
 
@@ -45,8 +44,11 @@ class Cartographer(Cog):
     - All server verification/security settings
     """
 
+    __author__ = "[vertyco](https://github.com/vertyco/vrt-cogs)"
+    __version__ = "1.1.5"
+
     def __init__(self, bot: Red):
-        super().__init__(bot)
+        super().__init__()
         self.bot = bot
         self.config = Config.get_conf(self, 117, force_registration=True)
         self.config.register_global(db={})
