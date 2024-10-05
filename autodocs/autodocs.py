@@ -87,7 +87,7 @@ class AutoDocs(Cog):
                 embedding_style,
                 min_privilage_level,
             )
-            command_level = determine_command_privilege_level(c)
+            command_level = self.determine_command_privilege_level(c)
             if command_level < min_level or command_level > max_level:
                 continue  # Skip commands outside the specified privilege range
             doc = c.get_doc()
@@ -112,7 +112,7 @@ class AutoDocs(Cog):
                 embedding_style,
                 min_privilage_level,
             )
-            command_level = determine_command_privilege_level(c)
+            command_level = self.determine_command_privilege_level(c)
             if command_level < min_level or command_level > max_level:
                 continue  # Skip commands outside the specified privilege range
             doc = c.get_doc()
@@ -145,8 +145,8 @@ class AutoDocs(Cog):
         replace_botname=_("Replace all occurrences of [botname] with the bots name"),
         extended_info=_("Include extra info like converters and their docstrings"),
         include_hidden=_("Include hidden commands"),
-        max_privilege_level=_("Hide commands above specified privilege level (user, mod, admin, guildowner, botowner)"),
-        min_privilage_level=_("Hide commands below specified privilege level (user, mod, admin, guildowner, botowner)"),
+        max_privilege_level=_("Hide commands above specified privilege level (none, mod, admin, guildowner, botowner)"),
+        min_privilage_level=_("Hide commands below specified privilege level (none, mod, admin, guildowner, botowner)"),
         csv_export=_("Include a csv with each command isolated per row"),
     )
     @commands.is_owner()
