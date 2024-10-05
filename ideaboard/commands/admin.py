@@ -74,25 +74,22 @@ class Admin(MixinMeta):
         embed.set_author(name=_("Ideaboard Settings"), icon_url=ctx.guild.icon)
 
         name = _("Cooldowns")
-        value = _("Base: {0.base_cooldown} seconds\nRole Cooldowns: {1}").format(
-            conf, "\n".join(f"{r}: {c}s" for r, c in cooldown_roles.items()) if cooldown_roles else _("None Set")
+        value = _("Base: {} seconds\nRole Cooldowns: {}").format(
+            conf.base_cooldown,
+            "\n".join(f"{r}: {c}s" for r, c in cooldown_roles.items()) if cooldown_roles else _("None Set"),
         )
         embed.add_field(name=name, value=value, inline=False)
 
         name = _("Account Age")
-        value = _(
-            "Minimum age of account to vote or suggest\n"
-            "Vote: {0.min_account_age_to_vote} hours\n"
-            "Suggest: {0.min_account_age_to_suggest} hours"
-        ).format(conf)
+        value = _("Minimum age of account to vote or suggest\nVote: {} hours\nSuggest: {} hours").format(
+            conf.min_account_age_to_vote, conf.min_account_age_to_suggest
+        )
         embed.add_field(name=name, value=value, inline=False)
 
         name = _("Join Time")
-        value = _(
-            "Minimum time in server to vote or suggest\n"
-            "Vote: {0.min_join_time_to_vote} hours\n"
-            "Suggest: {0.min_join_time_to_suggest} hours"
-        ).format(conf)
+        value = _("Minimum time in server to vote or suggest\nVote: {} hours\nSuggest: {} hours").format(
+            conf.min_join_time_to_vote, conf.min_join_time_to_suggest
+        )
         embed.add_field(name=name, value=value, inline=False)
 
         name = _("Vote Roles")
@@ -120,21 +117,28 @@ class Admin(MixinMeta):
         )
         embed.add_field(name=name, value=value, inline=False)
 
-        name = _("LevelUp Integration")
-        value = _(
-            "Minimum level required to vote or make suggestions.\n"
-            "Vote: {0.min_level_to_vote}\n"
-            "Suggest: {0.min_level_to_suggest}"
-        ).format(conf)
-        embed.add_field(name=name, value=value, inline=False)
+        if self.bot.get_cog("LevelUp"):
+            name = _("LevelUp Integration")
+            value = _("Minimum level required to vote or make suggestions.\nVote: {}\nSuggest: {}").format(
+                conf.min_level_to_vote, conf.min_level_to_suggest
+            )
+            embed.add_field(name=name, value=value, inline=False)
         if self.bot.get_cog("ArkTools"):
             name = _("Ark Playtime Integration")
-            value = _(
-                "Minimum playtime to vote or make suggestions\n"
-                "Vote: {0.min_playtime_to_vote} hours\n"
-                "Suggest: {0.min_playtime_to_suggest} hours"
-            ).format(conf)
+            value = _("Minimum playtime to vote or make suggestions\nVote: {} hours\nSuggest: {} hours").format(
+                conf.min_playtime_to_vote, conf.min_playtime_to_suggest
+            )
             embed.add_field(name=name, value=value, inline=False)
+
+        if conf.role_blacklist:
+            name = _("Role Blacklist")
+            value = "\n".join(ctx.guild.get_role(r).mention for r in conf.role_blacklist if ctx.guild.get_role(r))
+            embed.add_field(name=name, value=value, inline=False)
+        if conf.user_blacklist:
+            name = _("User Blacklist")
+            value = "\n".join(ctx.guild.get_member(r).mention for r in conf.user_blacklist if ctx.guild.get_member(r))
+            embed.add_field(name=name, value=value, inline=False)
+
         await ctx.send(embed=embed)
 
     @ideaset.command(name="channel")
@@ -373,27 +377,41 @@ class Admin(MixinMeta):
         await self.save()
 
     @ideaset.command(name="roleblacklist", aliases=["blacklistrole", "rolebl"])
-    async def role_blacklist(self, ctx: commands.Context, role: discord.Role):
+    async def role_blacklist(self, ctx: commands.Context, role: discord.Role | int):
         """Add/remove a role to/from the role blacklist"""
         conf = self.db.get_conf(ctx.guild)
-        if role.id in conf.role_blacklist:
-            conf.role_blacklist.remove(role.id)
-            await ctx.send(_("Role `{}` removed from blacklist.").format(role.name))
+        if isinstance(role, discord.Role):
+            if role.id in conf.role_blacklist:
+                conf.role_blacklist.remove(role.id)
+                await ctx.send(_("Role `{}` removed from blacklist.").format(role.name))
+            else:
+                conf.role_blacklist.append(role.id)
+                await ctx.send(_("Role `{}` added to blacklist.").format(role.name))
         else:
-            conf.role_blacklist.append(role.id)
-            await ctx.send(_("Role `{}` added to blacklist.").format(role.name))
+            if role in conf.role_blacklist:
+                conf.role_blacklist.remove(role)
+                await ctx.send(_("Role with ID `{}` removed from blacklist.").format(role))
+            else:
+                return await ctx.send(_("Role with ID `{}` not found in blacklist.").format(role))
         await self.save()
 
     @ideaset.command(name="userblacklist", aliases=["blacklistuser", "userbl"])
-    async def user_blacklist(self, ctx: commands.Context, member: discord.Member):
+    async def user_blacklist(self, ctx: commands.Context, member: discord.Member | int):
         """Add/remove a user to/from the user blacklist"""
         conf = self.db.get_conf(ctx.guild)
-        if member.id in conf.user_blacklist:
-            conf.user_blacklist.remove(member.id)
-            await ctx.send(_("User `{}` removed from blacklist.").format(member.display_name))
+        if isinstance(member, discord.Member):
+            if member.id in conf.user_blacklist:
+                conf.user_blacklist.remove(member.id)
+                await ctx.send(_("User `{}` removed from blacklist.").format(member.display_name))
+            else:
+                conf.user_blacklist.append(member.id)
+                await ctx.send(_("User `{}` added to blacklist.").format(member.display_name))
         else:
-            conf.user_blacklist.append(member.id)
-            await ctx.send(_("User `{}` added to blacklist.").format(member.display_name))
+            if member in conf.user_blacklist:
+                conf.user_blacklist.remove(member)
+                await ctx.send(_("User with ID `{}` removed from blacklist.").format(member))
+            else:
+                return await ctx.send(_("User with ID `{}` not found in blacklist.").format(member))
         await self.save()
 
     @ideaset.command(name="accountage")

@@ -1,13 +1,13 @@
 MODELS = {
     "gpt-3.5-turbo": 4096,
-    "gpt-3.5-turbo-1106": 16385,
-    "gpt-3.5-turbo-0125": 16385,
-    "gpt-3.5-turbo-16k": 16384,
-    "gpt-3.5-turbo-16k-0301": 16384,
+    # "gpt-3.5-turbo-1106": 16385, - Depricated
+    # "gpt-3.5-turbo-0125": 16385, - Depricated
+    # "gpt-3.5-turbo-16k": 16384, - Depricated
+    # "gpt-3.5-turbo-16k-0301": 16384, - Depricated
     # "gpt-3.5-turbo-16k-0613": 16384 - Depricated
-    "gpt-3.5-turbo-instruct": 8192,
+    # "gpt-3.5-turbo-instruct": 8192, - Depricated
     "gpt-4": 8192,
-    "gpt-4-32k": 32768,
+    # "gpt-4-32k": 32768, - Depricated
     "gpt-4-turbo": 128000,
     "gpt-4-turbo-preview": 128000,
     "gpt-4-1106-preview": 128000,
@@ -19,6 +19,10 @@ MODELS = {
     "gpt-4o-mini": 128000,
     "gpt-4o-mini-2024-07-18": 128000,
     "gpt-4o-2024-08-06": 128000,
+    "o1-preview": 128000,
+    "o1-preview-2024-09-12": 128000,
+    "o1-mini": 128000,
+    "o1-mini-2024-09-12": 128000,
 }
 PRICES = {
     "gpt-3.5-turbo": [0.001, 0.0015],
@@ -48,6 +52,10 @@ PRICES = {
     "gpt-4o-2024-08-06": [0.0025, 0.01],
     "gpt-4o-mini": [0.00015, 0.0006],
     "gpt-4o-mini-2024-07-18": [0.00015, 0.0006],
+    "o1-preview": [0.015, 0.06],
+    "o1-preview-2024-09-12": [0.015, 0.06],
+    "o1-mini": [0.003, 0.012],
+    "o1-mini-2024-09-12": [0.003, 0.012],
     "text-ada-001": [0.0004, 0.0016],
     "text-babbage-001": [0.0006, 0.0024],
     "text-curie-001": [0.003, 0.012],
@@ -81,6 +89,12 @@ SUPPORTS_SEED = [
     "gpt-4o-mini",
     "gpt-4o-mini-2024-07-18",
     "gpt-4o-2024-08-06",
+]
+NO_SYSTEM_MESSAGES = [
+    "o1-preview",
+    "o1-preview-2024-09-12",
+    "o1-mini",
+    "o1-mini-2024-09-12",
 ]
 SUPPORTS_VISION = [
     "gpt-4-vision-preview",
