@@ -3,6 +3,7 @@ import logging
 from io import BytesIO
 from typing import List, Literal, Optional, Tuple
 from zipfile import ZIP_DEFLATED, ZipFile
+import os
 
 import discord
 import pandas as pd
@@ -21,11 +22,46 @@ _ = Translator("AutoDocs", __file__)
 def get_folder_path(max_privilege_level: str, min_privilege_level: str = "user") -> str:
     """Determine the folder path based on privilege levels."""
     levels = ["user", "mod", "admin", "guildowner", "botowner"]
-    # Use the highest privilege level for the folder name
     max_index = levels.index(max_privilege_level)
     min_index = levels.index(min_privilege_level)
     folder_name = levels[max_index] if max_index >= min_index else levels[min_index]
-    return f"CogDocs/{folder_name}"
+    return os.path.join("CogDocs", folder_name)
+
+def generate_index_rst(cog_names: List[str]) -> str:
+    """Generate the content for index.rst including all cog names in the toctree."""
+    index_content = """
+.. _main:
+
+==========
+StarCogs
+==========
+
+This documentation is here for the support of my redbot cogs. Everything should be here that you need.
+
+============
+Useful Links
+============
+
+* `Github Repository <https://github.com/LeDeathAmongst/StarCogs>`_
+
+.. toctree::
+    :caption: Repository
+    :maxdepth: 2
+
+    repo_installation
+    repo_license
+    repo_support
+    repo_telemetry
+
+.. toctree::
+    :caption: Cogs documentations
+    :maxdepth: 1
+
+"""
+    for cog_name in cog_names:
+        index_content += f"    cog_{cog_name}\n"
+
+    return index_content
 
 @cog_i18n(_)
 class AutoDocs(Cog):
@@ -161,6 +197,10 @@ class AutoDocs(Cog):
         prefix = (await self.bot.get_valid_prefixes(ctx.guild))[0].strip() if replace_prefix else ""
         async with ctx.typing():
             folder_path = get_folder_path(max_privilege_level, min_privilage_level)
+            os.makedirs(folder_path, exist_ok=True)  # Ensure the directory exists
+
+            cog_names = []
+
             if cog_name == "all":
                 buffer = BytesIO()
                 with ZipFile(buffer, "w", compression=ZIP_DEFLATED, compresslevel=9) as arc:
@@ -168,6 +208,7 @@ class AutoDocs(Cog):
                         cog = self.bot.get_cog(cog)
                         if cog.qualified_name in IGNORE:
                             continue
+                        cog_names.append(cog.qualified_name)
                         partial_func = functools.partial(
                             self.generate_readme,
                             cog,
@@ -181,7 +222,7 @@ class AutoDocs(Cog):
                             csv_export,
                         )
                         docs, df = await self.bot.loop.run_in_executor(None, partial_func)
-                        filename = f"{folder_path}/{cog.qualified_name}.rst"
+                        filename = f"{folder_path}/cog_{cog.qualified_name}.rst"
 
                         if csv_export:
                             tmp = BytesIO()
@@ -199,6 +240,11 @@ class AutoDocs(Cog):
                                 compress_type=ZIP_DEFLATED,
                                 compresslevel=9,
                             )
+
+                    # Generate index.rst
+                    index_content = generate_index_rst(cog_names)
+                    arc.writestr(f"{folder_path}/index.rst", index_content)
+
                 buffer.name = f"{folder_path}.zip"
                 buffer.seek(0)
                 file = discord.File(buffer)
@@ -207,6 +253,7 @@ class AutoDocs(Cog):
                 cog = self.bot.get_cog(cog_name)
                 if not cog:
                     return await ctx.send(_("I could not find that cog, maybe it is not loaded?"))
+                cog_names.append(cog.qualified_name)
                 partial_func = functools.partial(
                     self.generate_readme,
                     cog,
@@ -223,14 +270,21 @@ class AutoDocs(Cog):
                 if csv_export:
                     buffer = BytesIO()
                     df.to_csv(buffer, index=False)
-                    buffer.name = f"{folder_path}/{cog.qualified_name}.csv"
+                    buffer.name = f"{folder_path}/cog_{cog.qualified_name}.csv"
                     buffer.seek(0)
                 else:
                     buffer = BytesIO(docs.encode())
-                    buffer.name = f"{folder_path}/{cog.qualified_name}.rst"
+                    buffer.name = f"{folder_path}/cog_{cog.qualified_name}.rst"
                     buffer.seek(0)
                 file = discord.File(buffer)
                 txt = _("Here are your docs for {}!").format(cog.qualified_name)
+
+                # Generate index.rst
+                index_content = generate_index_rst(cog_names)
+                index_buffer = BytesIO(index_content.encode())
+                index_buffer.name = f"{folder_path}/index.rst"
+                index_buffer.seek(0)
+                await ctx.send(file=discord.File(index_buffer))
 
             if file.__sizeof__() > ctx.guild.filesize_limit:
                 await ctx.send("File size too large!")
