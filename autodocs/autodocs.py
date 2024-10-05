@@ -45,15 +45,23 @@ class AutoDocs(Cog):
         max_privilege_level: str,
         min_privilage_level: str = "user",
         embedding_style: bool = False,
-    ) -> Tuple[str, pd.DataFrame]:
+    ) -> Tuple[dict, pd.DataFrame]:
         columns = [_("name"), _("text")]
         rows = []
         cog_name = cog.qualified_name
 
-        docs = f"{cog_name}\n{'=' * len(cog_name)}\n\n"
+        docs_by_level = {
+            "user": "",
+            "mod": "",
+            "admin": "",
+            "guildowner": "",
+            "botowner": ""
+        }
+
         cog_help = cog.help.strip() if cog.help else ""
         if cog_help and include_help:
-            docs += f"{cog_help}\n\n"
+            for level in docs_by_level:
+                docs_by_level[level] += f"{cog_name}\n{'=' * len(cog_name)}\n\n{cog_help}\n\n"
 
         for cmd in cog.walk_app_commands():
             c = CustomCmdFmt(
@@ -69,7 +77,8 @@ class AutoDocs(Cog):
             doc = c.get_doc()
             if not doc:
                 continue
-            docs += f"{doc}\n\n"
+            command_level = c.get_privilege_level()  # Assume this method gives the command's required privilege level
+            docs_by_level[command_level] += f"{doc}\n\n"
             csv_name = f"{c.name} command for {cog_name} cog"
             rows.append([csv_name, f"{csv_name}\n{doc}"])
 
@@ -98,11 +107,12 @@ class AutoDocs(Cog):
                     skip = True
             if skip:
                 continue
-            docs += f"{doc}\n\n"
+            command_level = c.get_privilege_level()  # Assume this method gives the command's required privilege level
+            docs_by_level[command_level] += f"{doc}\n\n"
             csv_name = f"{c.name} command for {cog_name} cog"
             rows.append([csv_name, f"{csv_name}\n{doc}"])
         df = pd.DataFrame(rows, columns=columns)
-        return docs, df
+        return docs_by_level, df
 
     @commands.hybrid_command(name="makedocs", description=_("Create docs for a cog"))
     @app_commands.describe(
@@ -176,8 +186,15 @@ class AutoDocs(Cog):
                             min_privilage_level,
                             csv_export,
                         )
-                        docs, df = await self.bot.loop.run_in_executor(None, partial_func)
-                        filename = f"{folder_name}/cog_{cog.qualified_name}.rst"
+                        docs_by_level, df = await self.bot.loop.run_in_executor(None, partial_func)
+                        for level, docs in docs_by_level.items():
+                            filename = f"{folder_name}/{level}/cog_{cog.qualified_name}.rst"
+                            arc.writestr(
+                                filename,
+                                docs,
+                                compress_type=ZIP_DEFLATED,
+                                compresslevel=9,
+                            )
 
                         if csv_export:
                             tmp = BytesIO()
@@ -185,13 +202,6 @@ class AutoDocs(Cog):
                             arc.writestr(
                                 filename.replace(".rst", ".csv"),
                                 tmp.getvalue(),
-                                compress_type=ZIP_DEFLATED,
-                                compresslevel=9,
-                            )
-                        else:
-                            arc.writestr(
-                                filename,
-                                docs,
                                 compress_type=ZIP_DEFLATED,
                                 compresslevel=9,
                             )
@@ -216,22 +226,17 @@ class AutoDocs(Cog):
                     min_privilage_level,
                     csv_export,
                 )
-                docs, df = await self.bot.loop.run_in_executor(None, partial_func)
-                if csv_export:
-                    buffer = BytesIO()
-                    df.to_csv(buffer, index=False)
-                    buffer.name = f"cog_{cog.qualified_name}.csv"
-                    buffer.seek(0)
-                else:
+                docs_by_level, df = await self.bot.loop.run_in_executor(None, partial_func)
+                for level, docs in docs_by_level.items():
                     buffer = BytesIO(docs.encode())
-                    buffer.name = f"cog_{cog.qualified_name}.rst"
+                    buffer.name = f"{level}/cog_{cog.qualified_name}.rst"
                     buffer.seek(0)
-                file = discord.File(buffer)
-                txt = _("Here are your docs for {}!").format(cog.qualified_name)
-            if file.__sizeof__() > ctx.guild.filesize_limit:
-                await ctx.send("File size too large!")
-            else:
-                await ctx.send(txt, file=file)
+                    file = discord.File(buffer)
+                    txt = _("Here are your docs for {} in the {} level!").format(cog.qualified_name, level)
+                    if file.__sizeof__() > ctx.guild.filesize_limit:
+                        await ctx.send("File size too large!")
+                    else:
+                        await ctx.send(txt, file=file)
 
     @cached(ttl=8)
     async def get_coglist(self, string: str) -> List[app_commands.Choice]:
