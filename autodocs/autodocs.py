@@ -31,7 +31,7 @@ class AutoDocs(Cog):
         """No data to delete"""
 
     def __init__(self, bot: Red, *args, **kwargs):
-        super().__init__(*args, **kwargs, bot)
+        super().__init__(*args, **kwargs)
         self.bot = bot
 
     def generate_readme(
