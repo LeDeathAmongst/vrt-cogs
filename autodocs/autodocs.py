@@ -53,7 +53,7 @@ class AutoDocs(Cog):
 
         # Map privilege level strings to the PrivilegeLevel enum
         privilege_map = {
-            "none": PrivilegeLevel.NONE,
+            "user": PrivilegeLevel.USER,
             "mod": PrivilegeLevel.MOD,
             "admin": PrivilegeLevel.ADMIN,
             "guildowner": PrivilegeLevel.GUILD_OWNER,
@@ -63,7 +63,7 @@ class AutoDocs(Cog):
         min_level = privilege_map[min_privilage_level]
 
         docs_by_level = {
-            PrivilegeLevel.NONE: "",
+            PrivilegeLevel.USER: "",
             PrivilegeLevel.MOD: "",
             PrivilegeLevel.ADMIN: "",
             PrivilegeLevel.GUILD_OWNER: "",
@@ -136,7 +136,7 @@ class AutoDocs(Cog):
         # Logic to determine the privilege level of the command
         if c.perms and c.perms.privilege_level:
             return c.perms.privilege_level
-        return PrivilegeLevel.NONE  # Default if no specific privilege level is set
+        return PrivilegeLevel.USER  # Default if no specific privilege level is set
 
     @commands.hybrid_command(name="makedocs", description=_("Create docs for a cog"))
     @app_commands.describe(
@@ -145,8 +145,8 @@ class AutoDocs(Cog):
         replace_botname=_("Replace all occurrences of [botname] with the bots name"),
         extended_info=_("Include extra info like converters and their docstrings"),
         include_hidden=_("Include hidden commands"),
-        max_privilege_level=_("Hide commands above specified privilege level (none, mod, admin, guildowner, botowner)"),
-        min_privilage_level=_("Hide commands below specified privilege level (none, mod, admin, guildowner, botowner)"),
+        max_privilege_level=_("Hide commands above specified privilege level (user, mod, admin, guildowner, botowner)"),
+        min_privilage_level=_("Hide commands below specified privilege level (user, mod, admin, guildowner, botowner)"),
         csv_export=_("Include a csv with each command isolated per row"),
     )
     @commands.is_owner()
@@ -161,8 +161,8 @@ class AutoDocs(Cog):
         extended_info: Optional[bool] = False,
         include_hidden: Optional[bool] = False,
         include_help: Optional[bool] = True,
-        max_privilege_level: Literal["none", "mod", "admin", "guildowner", "botowner"] = "botowner",
-        min_privilage_level: Literal["none", "mod", "admin", "guildowner", "botowner"] = "none",
+        max_privilege_level: Literal["user", "mod", "admin", "guildowner", "botowner"] = "botowner",
+        min_privilage_level: Literal["user", "mod", "admin", "guildowner", "botowner"] = "user",
         csv_export: Optional[bool] = False,
     ):
         """
@@ -177,7 +177,7 @@ class AutoDocs(Cog):
         `include_help:        `(bool) If True, includes the cog help text at the top of the docs
         `max_privilege_level: `(str) Hide commands above specified privilege level
         `min_privilage_level: `(str) Hide commands below specified privilege level
-        - (none, mod, admin, guildowner, botowner)
+        - (user, mod, admin, guildowner, botowner)
         `csv_export:          `(bool) Include a csv with each command isolated per row for use as embeddings
 
         **Note** If `all` is specified for cog_name, all currently loaded non-core cogs will have docs generated for
@@ -293,7 +293,7 @@ class AutoDocs(Cog):
         elif (await is_mod_or_superior(self.bot, user)) or user.guild_permissions.manage_messages:
             level = PrivilegeLevel.MOD
         else:
-            level = PrivilegeLevel.NONE
+            level = PrivilegeLevel.USER
 
         c = CustomCmdFmt(self.bot, command, prefixes[0], True, False, level, True)
         doc = c.get_doc()
