@@ -154,7 +154,7 @@ class AutoDocs(Cog):
         async with ctx.typing():
             if cog_name == "all":
                 buffer = BytesIO()
-                folder_name = _("AllCogDocs")
+                folder_name = _("StarCogs")
                 with ZipFile(buffer, "w", compression=ZIP_DEFLATED, compresslevel=9) as arc:
                     try:
                         arc.mkdir(folder_name, mode=755)
@@ -177,7 +177,7 @@ class AutoDocs(Cog):
                             csv_export,
                         )
                         docs, df = await self.bot.loop.run_in_executor(None, partial_func)
-                        filename = f"{folder_name}/{cog.qualified_name}.rst"
+                        filename = f"{folder_name}/cog_{cog.qualified_name}.rst"
 
                         if csv_export:
                             tmp = BytesIO()
@@ -220,11 +220,11 @@ class AutoDocs(Cog):
                 if csv_export:
                     buffer = BytesIO()
                     df.to_csv(buffer, index=False)
-                    buffer.name = f"{cog.qualified_name}.csv"
+                    buffer.name = f"cog_{cog.qualified_name}.csv"
                     buffer.seek(0)
                 else:
                     buffer = BytesIO(docs.encode())
-                    buffer.name = f"{cog.qualified_name}.rst"
+                    buffer.name = f"cog_{cog.qualified_name}.rst"
                     buffer.seek(0)
                 file = discord.File(buffer)
                 txt = _("Here are your docs for {}!").format(cog.qualified_name)
