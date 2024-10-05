@@ -12,6 +12,7 @@ from redbot.core import commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n, set_contextual_locales_from_guild
 from redbot.core.utils.mod import is_admin_or_superior, is_mod_or_superior
+from redbot.core.commands.requires import PrivilegeLevel
 from Star_Utils import Cog
 from .formatter import IGNORE, CustomCmdFmt
 
@@ -51,11 +52,11 @@ class AutoDocs(Cog):
         cog_name = cog.qualified_name
 
         docs_by_level = {
-            "user": "",
-            "mod": "",
-            "admin": "",
-            "guildowner": "",
-            "botowner": ""
+            PrivilegeLevel.NONE: "",
+            PrivilegeLevel.MOD: "",
+            PrivilegeLevel.ADMIN: "",
+            PrivilegeLevel.GUILD_OWNER: "",
+            PrivilegeLevel.BOT_OWNER: ""
         }
 
         cog_help = cog.help.strip() if cog.help else ""
@@ -188,7 +189,8 @@ class AutoDocs(Cog):
                         )
                         docs_by_level, df = await self.bot.loop.run_in_executor(None, partial_func)
                         for level, docs in docs_by_level.items():
-                            filename = f"{folder_name}/{level}/cog_{cog.qualified_name}.rst"
+                            level_name = PrivilegeLevel(level).name.lower()  # Convert enum to string
+                            filename = f"{folder_name}/{level_name}/cog_{cog.qualified_name}.rst"
                             arc.writestr(
                                 filename,
                                 docs,
@@ -228,11 +230,12 @@ class AutoDocs(Cog):
                 )
                 docs_by_level, df = await self.bot.loop.run_in_executor(None, partial_func)
                 for level, docs in docs_by_level.items():
+                    level_name = PrivilegeLevel(level).name.lower()  # Convert enum to string
                     buffer = BytesIO(docs.encode())
-                    buffer.name = f"{level}/cog_{cog.qualified_name}.rst"
+                    buffer.name = f"{level_name}/cog_{cog.qualified_name}.rst"
                     buffer.seek(0)
                     file = discord.File(buffer)
-                    txt = _("Here are your docs for {} in the {} level!").format(cog.qualified_name, level)
+                    txt = _("Here are your docs for {} in the {} level!").format(cog.qualified_name, level_name)
                     if file.__sizeof__() > ctx.guild.filesize_limit:
                         await ctx.send("File size too large!")
                     else:
@@ -259,15 +262,15 @@ class AutoDocs(Cog):
         prefixes = await self.bot.get_valid_prefixes(guild)
 
         if user.id in self.bot.owner_ids:
-            level = "botowner"
+            level = PrivilegeLevel.BOT_OWNER
         elif user.id == guild.owner_id or user.guild_permissions.manage_guild:
-            level = "guildowner"
+            level = PrivilegeLevel.GUILD_OWNER
         elif (await is_admin_or_superior(self.bot, user)) or user.guild_permissions.manage_roles:
-            level = "admin"
+            level = PrivilegeLevel.ADMIN
         elif (await is_mod_or_superior(self.bot, user)) or user.guild_permissions.manage_messages:
-            level = "mod"
+            level = PrivilegeLevel.MOD
         else:
-            level = "user"
+            level = PrivilegeLevel.NONE
 
         c = CustomCmdFmt(self.bot, command, prefixes[0], True, False, level, True)
         doc = c.get_doc()
