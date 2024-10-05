@@ -1,7 +1,7 @@
 import functools
 import logging
 from io import BytesIO
-from typing import List, Literal, Optional, Tuple
+from typing import List, Literal, Optional, Tuple, Union
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import discord
@@ -10,9 +10,9 @@ from aiocache import cached
 from discord import app_commands
 from redbot.core import commands
 from redbot.core.bot import Red
+from redbot.core.commands.requires import PrivilegeLevel
 from redbot.core.i18n import Translator, cog_i18n, set_contextual_locales_from_guild
 from redbot.core.utils.mod import is_admin_or_superior, is_mod_or_superior
-from redbot.core.commands.requires import PrivilegeLevel
 from Star_Utils import Cog
 from .formatter import IGNORE, CustomCmdFmt
 
@@ -51,6 +51,17 @@ class AutoDocs(Cog):
         rows = []
         cog_name = cog.qualified_name
 
+        # Map privilege level strings to the PrivilegeLevel enum
+        privilege_map = {
+            "none": PrivilegeLevel.NONE,
+            "mod": PrivilegeLevel.MOD,
+            "admin": PrivilegeLevel.ADMIN,
+            "guildowner": PrivilegeLevel.GUILD_OWNER,
+            "botowner": PrivilegeLevel.BOT_OWNER,
+        }
+        max_level = privilege_map[max_privilege_level]
+        min_level = privilege_map[min_privilage_level]
+
         docs_by_level = {
             PrivilegeLevel.NONE: "",
             PrivilegeLevel.MOD: "",
@@ -64,6 +75,7 @@ class AutoDocs(Cog):
             for level in docs_by_level:
                 docs_by_level[level] += f"{cog_name}\n{'=' * len(cog_name)}\n\n{cog_help}\n\n"
 
+        # Process app commands
         for cmd in cog.walk_app_commands():
             c = CustomCmdFmt(
                 self.bot,
@@ -75,14 +87,17 @@ class AutoDocs(Cog):
                 embedding_style,
                 min_privilage_level,
             )
+            command_level = determine_command_privilege_level(c)
+            if command_level < min_level or command_level > max_level:
+                continue  # Skip commands outside the specified privilege range
             doc = c.get_doc()
             if not doc:
                 continue
-            command_level = c.get_privilege_level()  # Assume this method gives the command's required privilege level
             docs_by_level[command_level] += f"{doc}\n\n"
             csv_name = f"{c.name} command for {cog_name} cog"
             rows.append([csv_name, f"{csv_name}\n{doc}"])
 
+        # Process regular commands
         ignored = []
         for cmd in cog.walk_commands():
             if cmd.hidden and not include_hidden:
@@ -97,6 +112,9 @@ class AutoDocs(Cog):
                 embedding_style,
                 min_privilage_level,
             )
+            command_level = determine_command_privilege_level(c)
+            if command_level < min_level or command_level > max_level:
+                continue  # Skip commands outside the specified privilege range
             doc = c.get_doc()
             if doc is None:
                 ignored.append(cmd.qualified_name)
@@ -108,12 +126,17 @@ class AutoDocs(Cog):
                     skip = True
             if skip:
                 continue
-            command_level = c.get_privilege_level()  # Assume this method gives the command's required privilege level
             docs_by_level[command_level] += f"{doc}\n\n"
             csv_name = f"{c.name} command for {cog_name} cog"
             rows.append([csv_name, f"{csv_name}\n{doc}"])
         df = pd.DataFrame(rows, columns=columns)
         return docs_by_level, df
+
+    def determine_command_privilege_level(self, c: CustomCmdFmt) -> PrivilegeLevel:
+        # Logic to determine the privilege level of the command
+        if c.perms and c.perms.privilege_level:
+            return c.perms.privilege_level
+        return PrivilegeLevel.NONE  # Default if no specific privilege level is set
 
     @commands.hybrid_command(name="makedocs", description=_("Create docs for a cog"))
     @app_commands.describe(
@@ -138,8 +161,8 @@ class AutoDocs(Cog):
         extended_info: Optional[bool] = False,
         include_hidden: Optional[bool] = False,
         include_help: Optional[bool] = True,
-        max_privilege_level: Literal["user", "mod", "admin", "guildowner", "botowner"] = "botowner",
-        min_privilage_level: Literal["user", "mod", "admin", "guildowner", "botowner"] = "user",
+        max_privilege_level: Literal["none", "mod", "admin", "guildowner", "botowner"] = "botowner",
+        min_privilage_level: Literal["none", "mod", "admin", "guildowner", "botowner"] = "none",
         csv_export: Optional[bool] = False,
     ):
         """
@@ -154,7 +177,7 @@ class AutoDocs(Cog):
         `include_help:        `(bool) If True, includes the cog help text at the top of the docs
         `max_privilege_level: `(str) Hide commands above specified privilege level
         `min_privilage_level: `(str) Hide commands below specified privilege level
-        - (user, mod, admin, guildowner, botowner)
+        - (none, mod, admin, guildowner, botowner)
         `csv_export:          `(bool) Include a csv with each command isolated per row for use as embeddings
 
         **Note** If `all` is specified for cog_name, all currently loaded non-core cogs will have docs generated for
