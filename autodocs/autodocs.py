@@ -21,11 +21,11 @@ _ = Translator("AutoDocs", __file__)
 def get_folder_path(max_privilege_level: str, min_privilege_level: str = "user") -> str:
     """Determine the folder path based on privilege levels."""
     levels = ["user", "mod", "admin", "guildowner", "botowner"]
+    # Use the highest privilege level for the folder name
     max_index = levels.index(max_privilege_level)
     min_index = levels.index(min_privilege_level)
-    # Use the highest privilege level for the folder name
     folder_name = levels[max_index] if max_index >= min_index else levels[min_index]
-    return folder_name
+    return f"CogDocs/{folder_name}"
 
 @cog_i18n(_)
 class AutoDocs(Cog):
@@ -181,7 +181,7 @@ class AutoDocs(Cog):
                             csv_export,
                         )
                         docs, df = await self.bot.loop.run_in_executor(None, partial_func)
-                        filename = f"{folder_path}/cog_{cog.qualified_name}.rst"
+                        filename = f"{folder_path}/{cog.qualified_name}.rst"
 
                         if csv_export:
                             tmp = BytesIO()
@@ -223,11 +223,11 @@ class AutoDocs(Cog):
                 if csv_export:
                     buffer = BytesIO()
                     df.to_csv(buffer, index=False)
-                    buffer.name = f"{folder_path}/cog_{cog.qualified_name}.csv"
+                    buffer.name = f"{folder_path}/{cog.qualified_name}.csv"
                     buffer.seek(0)
                 else:
                     buffer = BytesIO(docs.encode())
-                    buffer.name = f"{folder_path}/cog_{cog.qualified_name}.rst"
+                    buffer.name = f"{folder_path}/{cog.qualified_name}.rst"
                     buffer.seek(0)
                 file = discord.File(buffer)
                 txt = _("Here are your docs for {}!").format(cog.qualified_name)
