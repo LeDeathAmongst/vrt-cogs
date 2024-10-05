@@ -191,13 +191,13 @@ class AutoDocs(commands.Cog):
                             csv_export,
                         )
                         docs, df = await self.bot.loop.run_in_executor(None, partial_func)
-                        filename = f"{folder_name}/{cog.qualified_name}.md"
+                        filename = f"{folder_name}/{cog.qualified_name}.rst"
 
                         if csv_export:
                             tmp = BytesIO()
                             df.to_csv(tmp, index=False)
                             arc.writestr(
-                                filename.replace(".md", ".csv"),
+                                filename.replace(".rst", ".csv"),
                                 tmp.getvalue(),
                                 compress_type=ZIP_DEFLATED,
                                 compresslevel=9,
@@ -238,7 +238,7 @@ class AutoDocs(commands.Cog):
                     buffer.seek(0)
                 else:
                     buffer = BytesIO(docs.encode())
-                    buffer.name = f"{cog.qualified_name}.md"
+                    buffer.name = f"{cog.qualified_name}.rst"
                     buffer.seek(0)
                 file = discord.File(buffer)
                 txt = _("Here are your docs for {}!").format(cog.qualified_name)
