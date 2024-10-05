@@ -11,29 +11,12 @@ from redbot.core.utils.chat_formatting import humanize_list
 
 from .converters import CLASSCONVERTER, PRIVILEGES, get_converter_docstring
 
-log = logging.getLogger("red.vrt.autodocs.formatter")
+log = logging.getLogger("star.autodocs.formatter")
 _ = Translator("AutoDocs", __file__)
 
 
 # Core cog ignore list
-IGNORE = [
-    "Admin",
-    "Alias",
-    "Audio",
-    "Cleanup",
-    "Economy",
-    "Filter",
-    "General",
-    "Image",
-    "Mod",
-    "Modlog",
-    "Mutes",
-    "Permissions",
-    "Reports",
-    "Streams",
-    "Trivia",
-    "Warnings",
-]
+IGNORE = ["AAA3A_utils"]
 
 
 def is_block_start_or_end(line: str) -> bool:
