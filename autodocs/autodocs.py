@@ -12,35 +12,26 @@ from redbot.core import commands
 from redbot.core.bot import Red
 from redbot.core.i18n import Translator, cog_i18n, set_contextual_locales_from_guild
 from redbot.core.utils.mod import is_admin_or_superior, is_mod_or_superior
-
+from Star_Utils import Cog
 from .formatter import IGNORE, CustomCmdFmt
 
-log = logging.getLogger("red.vrt.autodocs")
+log = logging.getLogger("star.autodocs")
 _ = Translator("AutoDocs", __file__)
 
 
-# redgettext -D autodocs.py converters.py formatter.py
 @cog_i18n(_)
-class AutoDocs(commands.Cog):
+class AutoDocs(Cog):
     """
     Document your cogs with ease!
 
-    Easily create documentation for any cog in Markdown format.
+    Easily create documentation for any cog in reStructuredText format.
     """
-
-    __author__ = "[vertyco](https://github.com/vertyco/vrt-cogs)"
-    __version__ = "1.1.1"
-
-    def format_help_for_context(self, ctx):
-        helpcmd = super().format_help_for_context(ctx)
-        txt = _("{}\nCog Version: {}\nAuthor: {}").format(helpcmd, self.__version__, self.__author__)
-        return txt
 
     async def red_delete_data_for_user(self, *, requester, user_id: int):
         """No data to delete"""
 
     def __init__(self, bot: Red, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, bot)
         self.bot = bot
 
     def generate_readme(
@@ -59,15 +50,10 @@ class AutoDocs(commands.Cog):
         rows = []
         cog_name = cog.qualified_name
 
-        docs = ""
+        docs = f"{cog_name}\n{'=' * len(cog_name)}\n\n"
         cog_help = cog.help.strip() if cog.help else ""
-        if not embedding_style:
-            cog_help = cog_help.replace("\n", "<br/>")
-
         if cog_help and include_help:
-            docs = cog_help + "\n\n"
-            entry_name = _("{} cog description").format(cog_name)
-            rows.append([entry_name, f"{entry_name}\n{cog_help}"])
+            docs += f"{cog_help}\n\n"
 
         for cmd in cog.walk_app_commands():
             c = CustomCmdFmt(
@@ -83,7 +69,7 @@ class AutoDocs(commands.Cog):
             doc = c.get_doc()
             if not doc:
                 continue
-            docs += doc
+            docs += f"{doc}\n\n"
             csv_name = f"{c.name} command for {cog_name} cog"
             rows.append([csv_name, f"{csv_name}\n{doc}"])
 
@@ -112,7 +98,7 @@ class AutoDocs(commands.Cog):
                     skip = True
             if skip:
                 continue
-            docs += doc
+            docs += f"{doc}\n\n"
             csv_name = f"{c.name} command for {cog_name} cog"
             rows.append([csv_name, f"{csv_name}\n{doc}"])
         df = pd.DataFrame(rows, columns=columns)
@@ -146,7 +132,7 @@ class AutoDocs(commands.Cog):
         csv_export: Optional[bool] = False,
     ):
         """
-        Create a Markdown docs page for a cog and send to discord
+        Create a reStructuredText docs page for a cog and send to discord
 
         **Arguments**
         `cog_name:            `(str) The name of the cog you want to make docs for (Case Sensitive)
@@ -258,13 +244,6 @@ class AutoDocs(commands.Cog):
     async def get_cog_names(self, inter: discord.Interaction, current: str):
         return await self.get_coglist(current)
 
-    # ------------------------------------------------------------------------
-    # ------------------------------------------------------------------------
-    # ------------------------------------------------------------------------
-    # ------------------- ASSISTANT FUNCTION REGISTRATION --------------------
-    # ------------------------------------------------------------------------
-    # ------------------------------------------------------------------------
-    # ------------------------------------------------------------------------
     async def get_command_info(
         self, guild: discord.Guild, user: discord.Member, command_name: str, *args, **kwargs
     ) -> str:
