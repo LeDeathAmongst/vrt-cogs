@@ -1,7 +1,7 @@
 import functools
 import logging
 from io import BytesIO
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import discord
@@ -10,7 +10,6 @@ from aiocache import cached
 from discord import app_commands
 from redbot.core import commands
 from redbot.core.bot import Red
-from redbot.core.commands.requires import PrivilegeLevel
 from redbot.core.i18n import Translator, cog_i18n, set_contextual_locales_from_guild
 from redbot.core.utils.mod import is_admin_or_superior, is_mod_or_superior
 from Star_Utils import Cog
@@ -19,6 +18,14 @@ from .formatter import IGNORE, CustomCmdFmt
 log = logging.getLogger("star.autodocs")
 _ = Translator("AutoDocs", __file__)
 
+def get_folder_path(max_privilege_level: str, min_privilege_level: str = "user") -> str:
+    """Determine the folder path based on privilege levels."""
+    levels = ["user", "mod", "admin", "guildowner", "botowner"]
+    max_index = levels.index(max_privilege_level)
+    min_index = levels.index(min_privilege_level)
+    # Use the highest privilege level for the folder name
+    folder_name = levels[max_index] if max_index >= min_index else levels[min_index]
+    return folder_name
 
 @cog_i18n(_)
 class AutoDocs(Cog):
@@ -46,36 +53,16 @@ class AutoDocs(Cog):
         max_privilege_level: str,
         min_privilage_level: str = "user",
         embedding_style: bool = False,
-    ) -> Tuple[dict, pd.DataFrame]:
+    ) -> Tuple[str, pd.DataFrame]:
         columns = [_("name"), _("text")]
         rows = []
         cog_name = cog.qualified_name
 
-        # Map privilege level strings to the PrivilegeLevel enum
-        privilege_map = {
-            "user": PrivilegeLevel.USER,
-            "mod": PrivilegeLevel.MOD,
-            "admin": PrivilegeLevel.ADMIN,
-            "guildowner": PrivilegeLevel.GUILD_OWNER,
-            "botowner": PrivilegeLevel.BOT_OWNER,
-        }
-        max_level = privilege_map[max_privilege_level]
-        min_level = privilege_map[min_privilage_level]
-
-        docs_by_level = {
-            PrivilegeLevel.USER: "",
-            PrivilegeLevel.MOD: "",
-            PrivilegeLevel.ADMIN: "",
-            PrivilegeLevel.GUILD_OWNER: "",
-            PrivilegeLevel.BOT_OWNER: ""
-        }
-
+        docs = f"{cog_name}\n{'=' * len(cog_name)}\n\n"
         cog_help = cog.help.strip() if cog.help else ""
         if cog_help and include_help:
-            for level in docs_by_level:
-                docs_by_level[level] += f"{cog_name}\n{'=' * len(cog_name)}\n\n{cog_help}\n\n"
+            docs += f"{cog_help}\n\n"
 
-        # Process app commands
         for cmd in cog.walk_app_commands():
             c = CustomCmdFmt(
                 self.bot,
@@ -87,17 +74,13 @@ class AutoDocs(Cog):
                 embedding_style,
                 min_privilage_level,
             )
-            command_level = self.determine_command_privilege_level(c)
-            if command_level < min_level or command_level > max_level:
-                continue  # Skip commands outside the specified privilege range
             doc = c.get_doc()
             if not doc:
                 continue
-            docs_by_level[command_level] += f"{doc}\n\n"
+            docs += f"{doc}\n\n"
             csv_name = f"{c.name} command for {cog_name} cog"
             rows.append([csv_name, f"{csv_name}\n{doc}"])
 
-        # Process regular commands
         ignored = []
         for cmd in cog.walk_commands():
             if cmd.hidden and not include_hidden:
@@ -112,9 +95,6 @@ class AutoDocs(Cog):
                 embedding_style,
                 min_privilage_level,
             )
-            command_level = self.determine_command_privilege_level(c)
-            if command_level < min_level or command_level > max_level:
-                continue  # Skip commands outside the specified privilege range
             doc = c.get_doc()
             if doc is None:
                 ignored.append(cmd.qualified_name)
@@ -126,17 +106,11 @@ class AutoDocs(Cog):
                     skip = True
             if skip:
                 continue
-            docs_by_level[command_level] += f"{doc}\n\n"
+            docs += f"{doc}\n\n"
             csv_name = f"{c.name} command for {cog_name} cog"
             rows.append([csv_name, f"{csv_name}\n{doc}"])
         df = pd.DataFrame(rows, columns=columns)
-        return docs_by_level, df
-
-    def determine_command_privilege_level(self, c: CustomCmdFmt) -> PrivilegeLevel:
-        # Logic to determine the privilege level of the command
-        if c.perms and c.perms.privilege_level:
-            return c.perms.privilege_level
-        return PrivilegeLevel.USER  # Default if no specific privilege level is set
+        return docs, df
 
     @commands.hybrid_command(name="makedocs", description=_("Create docs for a cog"))
     @app_commands.describe(
@@ -186,14 +160,10 @@ class AutoDocs(Cog):
         await set_contextual_locales_from_guild(self.bot, ctx.guild)
         prefix = (await self.bot.get_valid_prefixes(ctx.guild))[0].strip() if replace_prefix else ""
         async with ctx.typing():
+            folder_path = get_folder_path(max_privilege_level, min_privilage_level)
             if cog_name == "all":
                 buffer = BytesIO()
-                folder_name = _("StarCogs")
                 with ZipFile(buffer, "w", compression=ZIP_DEFLATED, compresslevel=9) as arc:
-                    try:
-                        arc.mkdir(folder_name, mode=755)
-                    except AttributeError:
-                        arc.writestr(f"{folder_name}/", "")
                     for cog in self.bot.cogs:
                         cog = self.bot.get_cog(cog)
                         if cog.qualified_name in IGNORE:
@@ -210,16 +180,8 @@ class AutoDocs(Cog):
                             min_privilage_level,
                             csv_export,
                         )
-                        docs_by_level, df = await self.bot.loop.run_in_executor(None, partial_func)
-                        for level, docs in docs_by_level.items():
-                            level_name = PrivilegeLevel(level).name.lower()  # Convert enum to string
-                            filename = f"{folder_name}/{level_name}/cog_{cog.qualified_name}.rst"
-                            arc.writestr(
-                                filename,
-                                docs,
-                                compress_type=ZIP_DEFLATED,
-                                compresslevel=9,
-                            )
+                        docs, df = await self.bot.loop.run_in_executor(None, partial_func)
+                        filename = f"{folder_path}/cog_{cog.qualified_name}.rst"
 
                         if csv_export:
                             tmp = BytesIO()
@@ -230,8 +192,14 @@ class AutoDocs(Cog):
                                 compress_type=ZIP_DEFLATED,
                                 compresslevel=9,
                             )
-
-                buffer.name = f"{folder_name}.zip"
+                        else:
+                            arc.writestr(
+                                filename,
+                                docs,
+                                compress_type=ZIP_DEFLATED,
+                                compresslevel=9,
+                            )
+                buffer.name = f"{folder_path}.zip"
                 buffer.seek(0)
                 file = discord.File(buffer)
                 txt = _("Here are the docs for all of your currently loaded cogs!")
@@ -251,18 +219,23 @@ class AutoDocs(Cog):
                     min_privilage_level,
                     csv_export,
                 )
-                docs_by_level, df = await self.bot.loop.run_in_executor(None, partial_func)
-                for level, docs in docs_by_level.items():
-                    level_name = PrivilegeLevel(level).name.lower()  # Convert enum to string
-                    buffer = BytesIO(docs.encode())
-                    buffer.name = f"{level_name}/cog_{cog.qualified_name}.rst"
+                docs, df = await self.bot.loop.run_in_executor(None, partial_func)
+                if csv_export:
+                    buffer = BytesIO()
+                    df.to_csv(buffer, index=False)
+                    buffer.name = f"{folder_path}/cog_{cog.qualified_name}.csv"
                     buffer.seek(0)
-                    file = discord.File(buffer)
-                    txt = _("Here are your docs for {} in the {} level!").format(cog.qualified_name, level_name)
-                    if file.__sizeof__() > ctx.guild.filesize_limit:
-                        await ctx.send("File size too large!")
-                    else:
-                        await ctx.send(txt, file=file)
+                else:
+                    buffer = BytesIO(docs.encode())
+                    buffer.name = f"{folder_path}/cog_{cog.qualified_name}.rst"
+                    buffer.seek(0)
+                file = discord.File(buffer)
+                txt = _("Here are your docs for {}!").format(cog.qualified_name)
+
+            if file.__sizeof__() > ctx.guild.filesize_limit:
+                await ctx.send("File size too large!")
+            else:
+                await ctx.send(txt, file=file)
 
     @cached(ttl=8)
     async def get_coglist(self, string: str) -> List[app_commands.Choice]:
@@ -285,15 +258,15 @@ class AutoDocs(Cog):
         prefixes = await self.bot.get_valid_prefixes(guild)
 
         if user.id in self.bot.owner_ids:
-            level = PrivilegeLevel.BOT_OWNER
+            level = "botowner"
         elif user.id == guild.owner_id or user.guild_permissions.manage_guild:
-            level = PrivilegeLevel.GUILD_OWNER
+            level = "guildowner"
         elif (await is_admin_or_superior(self.bot, user)) or user.guild_permissions.manage_roles:
-            level = PrivilegeLevel.ADMIN
+            level = "admin"
         elif (await is_mod_or_superior(self.bot, user)) or user.guild_permissions.manage_messages:
-            level = PrivilegeLevel.MOD
+            level = "mod"
         else:
-            level = PrivilegeLevel.USER
+            level = "user"
 
         c = CustomCmdFmt(self.bot, command, prefixes[0], True, False, level, True)
         doc = c.get_doc()
